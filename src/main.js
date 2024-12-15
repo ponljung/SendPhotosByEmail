@@ -1,7 +1,11 @@
-import { Client, Databases, Functions, Query } from 'node-appwrite';
+import { Client, Databases, Functions } from 'node-appwrite';
 
 export default async function({ req, res, log, error }) {
   try {
+    // Constants matching the client side
+    const DATABASE_ID = '67589fa1001cb6a993c5';
+    const PHOTOS_COLLECTION_ID = '675ec21d000d21ec9d05';
+
     // Initialize Appwrite client
     const client = new Client()
       .setEndpoint('https://cloud.appwrite.io/v1')
@@ -22,10 +26,17 @@ export default async function({ req, res, log, error }) {
 
     const { email, photoSessionId } = data;
 
+    // Log the IDs we're using
+    log('Attempting to fetch document with:', {
+      databaseId: DATABASE_ID,
+      collectionId: PHOTOS_COLLECTION_ID,
+      documentId: photoSessionId
+    });
+
     // Get photo session data
     const photoSession = await databases.getDocument(
-      '67589fa1001cb6a993c5',
-      '675ec21d000d21ec9d05',
+      DATABASE_ID,
+      PHOTOS_COLLECTION_ID,
       photoSessionId
     );
 
@@ -64,8 +75,8 @@ export default async function({ req, res, log, error }) {
 
     // Update photo session status
     await databases.updateDocument(
-      '67589fa1001cb6a993c5',
-      '675ec21d000d21ec9d05',
+      DATABASE_ID,
+      PHOTOS_COLLECTION_ID,
       photoSessionId,
       {
         status: 'delivered',
@@ -81,9 +92,15 @@ export default async function({ req, res, log, error }) {
 
   } catch (err) {
     error('Error in email function:', err);
+    // Include more details in the error response
     return res.json({
       success: false,
-      message: err.message
+      message: err.message,
+      details: {
+        databaseId: DATABASE_ID,
+        collectionId: PHOTOS_COLLECTION_ID,
+        error: err.toString()
+      }
     }, 500);
   }
 }
