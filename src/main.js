@@ -71,20 +71,28 @@ export default async function({ req, res, log, error }) {
       </div>
     `;
 
-    // Send email using SendGrid SMTP provider
-    const message = await client.call('post', '/messaging/messages/email', {
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Appwrite-Project': process.env.APPWRITE_FUNCTION_PROJECT_ID,
-        'X-Appwrite-Key': process.env.APPWRITE_API_KEY
-      },
-      body: JSON.stringify({
-        messageId: '675ed68e0038082702b4', // Your SendGrid provider ID
-        to: [email],
-        subject: 'Your Photobooth Pictures Are Ready!',
-        html: emailHtml
-      })
-    });
+    try {
+      const message = await client.call('post', '/messaging/messages/email', {
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Appwrite-Project': process.env.APPWRITE_FUNCTION_PROJECT_ID,
+          'X-Appwrite-Key': process.env.APPWRITE_API_KEY
+        },
+        body: JSON.stringify({
+          messageId: '675ed68e0038082702b4',
+          to: [email],
+          subject: 'Your Photobooth Pictures Are Ready!',
+          html: emailHtml
+        })
+      });
+    } catch (err) {
+      // Add more specific error handling
+      if (err.message.includes('missing scope')) {
+        error('Permission error: Function lacks required messaging permissions');
+        throw new Error('Email service configuration error');
+      }
+      throw err;
+    }
 
     log('Email sent:', message);
 
