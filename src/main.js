@@ -7,27 +7,65 @@ export default async function({ req, res, log, error }) {
     .setEndpoint('https://cloud.appwrite.io/v1')
     .setProject(process.env.APPWRITE_FUNCTION_PROJECT_ID)
     .setKey(process.env.APPWRITE_API_KEY);
-
   const databases = new Databases(client);
+  
+  // Validate SendGrid API key
+  if (!process.env.SENDGRID_API_KEY) {
+    error('SendGrid API key is not configured');
+    return res.json({
+      success: false,
+      message: 'Email service configuration error'
+    }, 500);
+  }
+  
   sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
   try {
-    const { email, photoSessionId } = JSON.parse(req.payload);
+    // Validate payload
+    if (!req.payload) {
+      throw new Error('No payload provided');
+    }
+
+    let parsedPayload;
+    try {
+      parsedPayload = JSON.parse(req.payload);
+    } catch (parseError) {
+      throw new Error(`Invalid JSON payload: ${parseError.message}`);
+    }
+
+    const { email, photoSessionId } = parsedPayload;
+    
+    // Validate required fields
+    if (!email || !photoSessionId) {
+      throw new Error('Missing required fields: email and photoSessionId are required');
+    }
+
     log('Processing email request:', { email, photoSessionId });
 
-    // Get photo session data
-    const photoSession = await databases.getDocument(
-      '670bb74a001bfc682ba3', // Your database ID
-      '675ec21d000d21ec9d05', // Your photoSessions collection ID
-      photoSessionId
-    );
+    // Get photo session data with error handling
+    let photoSession;
+    try {
+      photoSession = await databases.getDocument(
+        '670bb74a001bfc682ba3',
+        '675ec21d000d21ec9d05',
+        photoSessionId
+      );
+    } catch (dbError) {
+      error('Database error:', dbError);
+      throw new Error(`Failed to retrieve photo session: ${dbError.message}`);
+    }
 
     log('Retrieved photo session:', photoSession);
+
+    // Validate photo URLs
+    if (!photoSession.photoUrls || !Array.isArray(photoSession.photoUrls) || photoSession.photoUrls.length === 0) {
+      throw new Error('No photo URLs found in the session');
+    }
 
     // Prepare email
     const msg = {
       to: email,
-      from: 'your-verified-sender@yourdomain.com', // Update this with your SendGrid verified sender
+      from: process.env.SENDGRID_VERIFIED_SENDER || 'your-verified-sender@yourdomain.com',
       subject: 'Your Photobooth Pictures Are Ready! 📸',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -46,31 +84,58 @@ export default async function({ req, res, log, error }) {
       `
     };
 
-    log('Sending email...');
-    await sgMail.send(msg);
-    log('Email sent successfully');
+    log('Attempting to send email with configuration:', {
+      to: email,
+      from: msg.from,
+      subject: msg.subject,
+      photoCount: photoSession.photoUrls.length
+    });
 
-    // Update photo session status
-    await databases.updateDocument(
-      '670bb74a001bfc682ba3',
-      '675ec21d000d21ec9d05',
-      photoSessionId,
-      {
-        status: 'delivered',
-        deliveredAt: new Date().toISOString()
+    // Send email with error handling
+    try {
+      await sgMail.send(msg);
+      log('Email sent successfully');
+    } catch (emailError) {
+      error('SendGrid error:', emailError);
+      if (emailError.response) {
+        error('SendGrid error details:', emailError.response.body);
       }
-    );
+      throw new Error(`Failed to send email: ${emailError.message}`);
+    }
+
+    // Update photo session status with error handling
+    try {
+      await databases.updateDocument(
+        '670bb74a001bfc682ba3',
+        '675ec21d000d21ec9d05',
+        photoSessionId,
+        {
+          status: 'delivered',
+          deliveredAt: new Date().toISOString()
+        }
+      );
+    } catch (updateError) {
+      error('Failed to update photo session status:', updateError);
+      // Don't throw here since email was sent successfully
+      log('Warning: Photo session status update failed but email was sent');
+    }
 
     return res.json({
       success: true,
       message: 'Photos sent successfully'
     });
-
+    
   } catch (err) {
-    error('Error in SendPhotosByEmail:', err);
+    error('Error in SendPhotosByEmail:', {
+      message: err.message,
+      stack: err.stack,
+      payload: req.payload
+    });
+    
     return res.json({
       success: false,
-      message: err.message
+      message: err.message,
+      details: process.env.NODE_ENV === 'development' ? err.stack : undefined
     }, 500);
   }
 }
