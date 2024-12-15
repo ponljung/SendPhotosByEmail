@@ -60,13 +60,10 @@ export default async function({ req, res, log, error }) {
       </div>
     `;
 
-    // Send email using Appwrite's built-in messaging - removed emoji from subject
-    const message = await client.call('post', '/messaging/smtp/send', {
-      headers: {
-        'Content-Type': 'application/json',
-      },
+    // Send email using SendGrid SMTP provider
+    const message = await client.call('post', '/messaging/messages/email', {
       body: JSON.stringify({
-        from: 'noreply@appwrite.io',  // Make sure this is your configured sender
+        messageId: 'unique_smtp.sendgrid.net', // Your SendGrid provider ID from Appwrite
         to: [email],
         subject: 'Your Photobooth Pictures Are Ready!',
         html: emailHtml
