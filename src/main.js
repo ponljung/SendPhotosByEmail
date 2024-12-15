@@ -84,30 +84,17 @@ export default async function({ req, res, log, error }) {
           'X-Appwrite-Key': process.env.APPWRITE_API_KEY
         },
         body: JSON.stringify({
-          from: 'your-verified-sender@yourdomain.com', // Add your verified sender email
+          from: process.env.SMTP_FROM_EMAIL,
           to: [email],
           subject: 'Your Photobooth Pictures Are Ready!',
           html: emailHtml,
-          providerId: 'smtp.sendgrid.net' // This should match your SMTP provider ID
+          providerId: 'smtp.sendgrid.net'
         })
       });
     
       log('Email sent successfully:', message);
-      
-      return message;
-    } catch (err) {
-      if (err.message.includes('missing scope')) {
-        error('Permission error: Function lacks required messaging permissions');
-        throw new Error('Email service configuration error');
-      }
-      error('Email sending error:', err);
-      throw err;
-    };
-  
-
-
-    // Try to update photo session status
-    try {
+    
+      // Update photo session status
       await databases.updateDocument(
         DATABASE_ID,
         PHOTOS_COLLECTION_ID,
@@ -118,14 +105,36 @@ export default async function({ req, res, log, error }) {
           deliveredAt: new Date().toISOString()
         }
       );
-    } catch (updateError) {
-      log('Warning: Could not update document status:', updateError);
+    
+      return res.json({
+        success: true,
+        message: 'Photos sent successfully'
+      });
+    
+    } catch (err) {
+      // Move specific database update error handling here
+      if (err.code === 'document_update_failed') {
+        log('Warning: Could not update document status:', err);
+        // Still return success since email was sent
+        return res.json({
+          success: true,
+          message: 'Photos sent successfully but failed to update status'
+        });
+      }
+    
+      if (err.message.includes('missing scope')) {
+        error('Permission error: Function lacks required messaging permissions');
+        throw new Error('Email service configuration error');
+      }
+      error('Email sending error:', err);
+      return res.json({
+        success: false,
+        message: err.message,
+        details: {
+          error: err.toString()
+        }
+      }, 500);
     }
-
-    return res.json({
-      success: true,
-      message: 'Photos sent successfully'
-    });
 
   } catch (err) {
     error('Error in email function:', err);
