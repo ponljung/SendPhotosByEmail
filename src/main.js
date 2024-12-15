@@ -18,10 +18,10 @@ export default async function({ req, res, log, error }) {
     // Initialize databases client
     const databases = new Databases(client);
 
-    if (!process.env.SMTP_FROM_EMAIL) {
-      throw new Error('SMTP_FROM_EMAIL environment variable is not set');
-    }
-    log('Using sender email:', process.env.SMTP_FROM_EMAIL);
+    //if (!process.env.SMTP_FROM_EMAIL) {
+    //  throw new Error('SMTP_FROM_EMAIL environment variable is not set');
+    //}
+    //log('Using sender email:', process.env.SMTP_FROM_EMAIL);
 
     // Try printing some environment info for debugging
     log('Environment variables:', {
