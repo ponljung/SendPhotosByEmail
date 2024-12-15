@@ -72,6 +72,11 @@ export default async function({ req, res, log, error }) {
     `;
 
     try {
+      log('Attempting to send email with data:', {
+        to: email,
+        subject: 'Your Photobooth Pictures Are Ready!'
+      });
+    
       const message = await client.call('post', '/messaging/messages/email', {
         headers: {
           'Content-Type': 'application/json',
@@ -79,22 +84,27 @@ export default async function({ req, res, log, error }) {
           'X-Appwrite-Key': process.env.APPWRITE_API_KEY
         },
         body: JSON.stringify({
-          messageId: '675ed68e0038082702b4',
+          from: 'your-verified-sender@yourdomain.com', // Add your verified sender email
           to: [email],
           subject: 'Your Photobooth Pictures Are Ready!',
-          html: emailHtml
+          html: emailHtml,
+          providerId: 'smtp.sendgrid.net' // This should match your SMTP provider ID
         })
       });
+    
+      log('Email sent successfully:', message);
+      
+      return message;
     } catch (err) {
-      // Add more specific error handling
       if (err.message.includes('missing scope')) {
         error('Permission error: Function lacks required messaging permissions');
         throw new Error('Email service configuration error');
       }
+      error('Email sending error:', err);
       throw err;
-    }
+    };
+  
 
-    log('Email sent:', message);
 
     // Try to update photo session status
     try {
