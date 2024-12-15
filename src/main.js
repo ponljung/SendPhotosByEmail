@@ -18,6 +18,11 @@ export default async function({ req, res, log, error }) {
     // Initialize databases client
     const databases = new Databases(client);
 
+    if (!process.env.SMTP_FROM_EMAIL) {
+      throw new Error('SMTP_FROM_EMAIL environment variable is not set');
+    }
+    log('Using sender email:', process.env.SMTP_FROM_EMAIL);
+
     // Try printing some environment info for debugging
     log('Environment variables:', {
       projectId: process.env.APPWRITE_FUNCTION_PROJECT_ID,
@@ -88,7 +93,7 @@ export default async function({ req, res, log, error }) {
           to: [email],
           subject: 'Your Photobooth Pictures Are Ready!',
           html: emailHtml,
-          providerId: 'smtp.sendgrid.net'
+          providerId: '675ed68e0038082702b4' // Updated ID
         })
       });
     
@@ -112,6 +117,7 @@ export default async function({ req, res, log, error }) {
       });
     
     } catch (err) {
+      error('Detailed error:', JSON.stringify(err));
       // Move specific database update error handling here
       if (err.code === 'document_update_failed') {
         log('Warning: Could not update document status:', err);
