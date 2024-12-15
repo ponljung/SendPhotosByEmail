@@ -24,7 +24,7 @@ export default async function({ req, res, log, error }) {
 
     // Get photo session data
     const photoSession = await databases.getDocument(
-      '670bb74a001bfc682ba3',
+      '67589fa1001cb6a993c5',
       '675ec21d000d21ec9d05',
       photoSessionId
     );
