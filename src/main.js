@@ -1,5 +1,3 @@
-import { Client, Databases } from 'node-appwrite';
-
 export default async function({ req, res, log, error }) {
   try {
     // Define constants inside the function
@@ -26,9 +24,11 @@ export default async function({ req, res, log, error }) {
 
     const { email, photoSessionId, photoUrls } = data;
 
+    // If we have photoUrls directly in the request, use those
+    // Otherwise try to fetch from database
     let photos = photoUrls;
-    if (!photos) {
-      log('PhotoUrls not provided, fetching from database...');
+    if (!photos || photos.length === 0) {
+      log('No photoUrls provided, attempting to fetch from database');
       const photoSession = await databases.getDocument(
         DATABASE_ID,
         PHOTOS_COLLECTION_ID,
@@ -37,28 +37,12 @@ export default async function({ req, res, log, error }) {
       photos = photoSession.photoUrls;
     }
 
-    // Log the IDs we're using
-    log('Attempting to fetch document with:', {
-      databaseId: DATABASE_ID,
-      collectionId: PHOTOS_COLLECTION_ID,
-      documentId: photoSessionId
-    });
-
-    // Get photo session data
-    const photoSession = await databases.getDocument(
-      DATABASE_ID,
-      PHOTOS_COLLECTION_ID,
-      photoSessionId
-    );
-
-    log('Retrieved photo session:', photoSession);
-
-    if (!photoSession.photoUrls || photoSession.photoUrls.length === 0) {
-      throw new Error('No photos found in session');
+    if (!photos || photos.length === 0) {
+      throw new Error('No photos found');
     }
 
     // Create HTML for images
-    const imagesHtml = photoSession.photoUrls
+    const imagesHtml = photos
       .map(url => `<div style="margin: 10px 0;"><img src="${url}" style="max-width: 100%; border-radius: 8px;" /></div>`)
       .join('');
 
@@ -84,17 +68,22 @@ export default async function({ req, res, log, error }) {
 
     log('Email sent:', message);
 
-    // Update photo session status
-    await databases.updateDocument(
-      DATABASE_ID,
-      PHOTOS_COLLECTION_ID,
-      photoSessionId,
-      {
-        status: 'delivered',
-        userEmail: email,
-        deliveredAt: new Date().toISOString()
-      }
-    );
+    // Try to update photo session status - don't fail if this doesn't work
+    try {
+      await databases.updateDocument(
+        DATABASE_ID,
+        PHOTOS_COLLECTION_ID,
+        photoSessionId,
+        {
+          status: 'delivered',
+          userEmail: email,
+          deliveredAt: new Date().toISOString()
+        }
+      );
+    } catch (updateError) {
+      log('Warning: Could not update document status:', updateError);
+      // Continue execution even if update fails
+    }
 
     return res.json({
       success: true,
