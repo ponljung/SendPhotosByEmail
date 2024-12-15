@@ -1,35 +1,76 @@
-import { Client, Users } from 'node-appwrite';
+import { Client, Databases } from 'node-appwrite';
+import sgMail from '@sendgrid/mail';
 
-// This Appwrite function will be executed every time your function is triggered
-export default async ({ req, res, log, error }) => {
-  // You can use the Appwrite SDK to interact with other services
-  // For this example, we're using the Users service
+export default async function({ req, res, log, error }) {
+  // Initialize Appwrite client
   const client = new Client()
-    .setEndpoint(process.env.APPWRITE_FUNCTION_API_ENDPOINT)
+    .setEndpoint('https://cloud.appwrite.io/v1')
     .setProject(process.env.APPWRITE_FUNCTION_PROJECT_ID)
-    .setKey(req.headers['x-appwrite-key'] ?? '');
-  const users = new Users(client);
+    .setKey(process.env.APPWRITE_API_KEY);
+
+  const databases = new Databases(client);
+  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
   try {
-    const response = await users.list();
-    // Log messages and errors to the Appwrite Console
-    // These logs won't be seen by your end users
-    log(`Total users: ${response.total}`);
-  } catch(err) {
-    error("Could not list users: " + err.message);
-  }
+    const { email, photoSessionId } = JSON.parse(req.payload);
+    log('Processing email request:', { email, photoSessionId });
 
-  // The req object contains the request data
-  if (req.path === "/ping") {
-    // Use res object to respond with text(), json(), or binary()
-    // Don't forget to return a response!
-    return res.text("Pong");
-  }
+    // Get photo session data
+    const photoSession = await databases.getDocument(
+      '67589fa1001cb6a993c5', // Your database ID
+      '675ec21d000d21ec9d05', // Your photoSessions collection ID
+      photoSessionId
+    );
 
-  return res.json({
-    motto: "Build like a team of hundreds_",
-    learn: "https://appwrite.io/docs",
-    connect: "https://appwrite.io/discord",
-    getInspired: "https://builtwith.appwrite.io",
-  });
-};
+    log('Retrieved photo session:', photoSession);
+
+    // Prepare email
+    const msg = {
+      to: email,
+      from: 'your-verified-sender@yourdomain.com', // Update this with your SendGrid verified sender
+      subject: 'Your Photobooth Pictures Are Ready! 📸',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h1>Your Photos Are Ready! 🎉</h1>
+          <p>Thank you for using our photobooth! Here are your photos:</p>
+          <div style="margin: 20px 0;">
+            ${photoSession.photoUrls.map(url => `
+              <div style="margin: 10px 0;">
+                <img src="${url}" style="max-width: 100%; border-radius: 8px;" />
+              </div>
+            `).join('')}
+          </div>
+          <p>Your photos will be available for download for the next 24 hours.</p>
+          <p>We hope you had a great time!</p>
+        </div>
+      `
+    };
+
+    log('Sending email...');
+    await sgMail.send(msg);
+    log('Email sent successfully');
+
+    // Update photo session status
+    await databases.updateDocument(
+      '670bb74a001bfc682ba3',
+      '675ec21d000d21ec9d05',
+      photoSessionId,
+      {
+        status: 'delivered',
+        deliveredAt: new Date().toISOString()
+      }
+    );
+
+    return res.json({
+      success: true,
+      message: 'Photos sent successfully'
+    });
+
+  } catch (err) {
+    error('Error in SendPhotosByEmail:', err);
+    return res.json({
+      success: false,
+      message: err.message
+    }, 500);
+  }
+}
