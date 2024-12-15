@@ -24,7 +24,18 @@ export default async function({ req, res, log, error }) {
       throw new Error('Missing required fields: email and photoSessionId');
     }
 
-    const { email, photoSessionId } = data;
+    const { email, photoSessionId, photoUrls } = data;
+
+    let photos = photoUrls;
+    if (!photos) {
+      log('PhotoUrls not provided, fetching from database...');
+      const photoSession = await databases.getDocument(
+        DATABASE_ID,
+        PHOTOS_COLLECTION_ID,
+        photoSessionId
+      );
+      photos = photoSession.photoUrls;
+    }
 
     // Log the IDs we're using
     log('Attempting to fetch document with:', {
