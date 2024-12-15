@@ -62,9 +62,15 @@ export default async function({ req, res, log, error }) {
 
     // Send email using Appwrite's built-in messaging - removed emoji from subject
     const message = await client.call('post', '/messaging/smtp/send', {
-      to: [email],
-      subject: 'Your Photobooth Pictures Are Ready!',
-      html: emailHtml
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: 'noreply@appwrite.io',  // Make sure this is your configured sender
+        to: [email],
+        subject: 'Your Photobooth Pictures Are Ready!',
+        html: emailHtml
+      })
     });
 
     log('Email sent:', message);
