@@ -1,4 +1,5 @@
 import { Client, Databases } from 'node-appwrite';
+
 export default async function({ req, res, log, error }) {
   try {
     // Define constants inside the function
@@ -26,7 +27,6 @@ export default async function({ req, res, log, error }) {
     const { email, photoSessionId, photoUrls } = data;
 
     // If we have photoUrls directly in the request, use those
-    // Otherwise try to fetch from database
     let photos = photoUrls;
     if (!photos || photos.length === 0) {
       log('No photoUrls provided, attempting to fetch from database');
@@ -47,10 +47,10 @@ export default async function({ req, res, log, error }) {
       .map(url => `<div style="margin: 10px 0;"><img src="${url}" style="max-width: 100%; border-radius: 8px;" /></div>`)
       .join('');
 
-    // Create email content
+    // Create email content without emojis
     const emailHtml = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h1>Your Photos Are Ready! 🎉</h1>
+        <h1>Your Photos Are Ready!</h1>
         <p>Thank you for using our photobooth! Here are your photos:</p>
         <div style="margin: 20px 0;">
           ${imagesHtml}
@@ -60,16 +60,16 @@ export default async function({ req, res, log, error }) {
       </div>
     `;
 
-    // Send email using Appwrite's built-in messaging
+    // Send email using Appwrite's built-in messaging - removed emoji from subject
     const message = await client.call('post', '/messaging/smtp/send', {
       to: [email],
-      subject: 'Your Photobooth Pictures Are Ready! 📸',
+      subject: 'Your Photobooth Pictures Are Ready!',
       html: emailHtml
     });
 
     log('Email sent:', message);
 
-    // Try to update photo session status - don't fail if this doesn't work
+    // Try to update photo session status
     try {
       await databases.updateDocument(
         DATABASE_ID,
@@ -83,7 +83,6 @@ export default async function({ req, res, log, error }) {
       );
     } catch (updateError) {
       log('Warning: Could not update document status:', updateError);
-      // Continue execution even if update fails
     }
 
     return res.json({
