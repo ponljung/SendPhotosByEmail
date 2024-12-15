@@ -64,7 +64,7 @@ export default async function({ req, res, log, error }) {
 
     // Update photo session status
     await databases.updateDocument(
-      '670bb74a001bfc682ba3',
+      '67589fa1001cb6a993c5',
       '675ec21d000d21ec9d05',
       photoSessionId,
       {
