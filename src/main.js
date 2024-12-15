@@ -1,8 +1,8 @@
-import { Client, Databases, Functions } from 'node-appwrite';
+import { Client, Databases } from 'node-appwrite';
 
 export default async function({ req, res, log, error }) {
   try {
-    // Constants matching the client side
+    // Define constants inside the function
     const DATABASE_ID = '67589fa1001cb6a993c5';
     const PHOTOS_COLLECTION_ID = '675ec21d000d21ec9d05';
 
@@ -92,13 +92,10 @@ export default async function({ req, res, log, error }) {
 
   } catch (err) {
     error('Error in email function:', err);
-    // Include more details in the error response
     return res.json({
       success: false,
       message: err.message,
       details: {
-        databaseId: DATABASE_ID,
-        collectionId: PHOTOS_COLLECTION_ID,
         error: err.toString()
       }
     }, 500);
