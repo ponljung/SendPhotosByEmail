@@ -1,4 +1,4 @@
-import { Client, Databases } from 'node-appwrite';
+import { Client, Databases, Permission, Role } from 'node-appwrite';
 
 export default async function({ req, res, log, error }) {
   try {
@@ -6,13 +6,24 @@ export default async function({ req, res, log, error }) {
     const DATABASE_ID = '67589fa1001cb6a993c5';
     const PHOTOS_COLLECTION_ID = '675ec21d000d21ec9d05';
 
-    // Initialize Appwrite client
+    // Initialize Appwrite client with explicit permissions
     const client = new Client()
       .setEndpoint('https://cloud.appwrite.io/v1')
       .setProject(process.env.APPWRITE_FUNCTION_PROJECT_ID)
-      .setKey(process.env.APPWRITE_API_KEY);
+      .setKey(process.env.APPWRITE_API_KEY)
+      .setSelfSigned(); // Add this if you're getting SSL errors
 
+    log('Client initialized with project:', process.env.APPWRITE_FUNCTION_PROJECT_ID);
+
+    // Initialize databases client
     const databases = new Databases(client);
+
+    // Try printing some environment info for debugging
+    log('Environment variables:', {
+      projectId: process.env.APPWRITE_FUNCTION_PROJECT_ID,
+      endpoint: process.env.APPWRITE_ENDPOINT,
+      functionId: process.env.APPWRITE_FUNCTION_ID
+    });
 
     log('Starting email function');
 
@@ -62,8 +73,13 @@ export default async function({ req, res, log, error }) {
 
     // Send email using SendGrid SMTP provider
     const message = await client.call('post', '/messaging/messages/email', {
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Appwrite-Project': process.env.APPWRITE_FUNCTION_PROJECT_ID,
+        'X-Appwrite-Key': process.env.APPWRITE_API_KEY
+      },
       body: JSON.stringify({
-        messageId: 'unique_smtp.sendgrid.net', // Your SendGrid provider ID from Appwrite
+        messageId: '675ed68e0038082702b4', // Your SendGrid provider ID
         to: [email],
         subject: 'Your Photobooth Pictures Are Ready!',
         html: emailHtml
